@@ -1,0 +1,821 @@
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+from web3 import Web3
+
+# Set up your Ethereum node and smart contract details
+ETH_NODE_URL = 'https://eth-mainnet.g.alchemy.com/v2/Xa9XkcDQHWRKhdw9bFhAXaEv_xMyGtf6'
+CONTRACT_ADDRESS = '0x36f93fdc4ddE9833dBBC0A529Da89569071db93E'
+CONTRACT_ABI = [{
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+    }],
+    "name":
+    "AddressEmptyCode",
+    "type":
+    "error"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+    }],
+    "name":
+    "AddressInsufficientBalance",
+    "type":
+    "error"
+}, {
+    "inputs": [],
+    "name": "AlreadyAMultiSigWallet",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "AlreadyClaimed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "AmountExceedsAvailableTokens",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "AmountMustBeLessThanAvailableTokens",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "CannotClaimNativeTokens",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "CannotSetDateInPast",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "CannotSetThePastRoundPrice",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ClaimsAreEnabledAlready",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ClaimsAreNotAvailableYet",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ETHRefundFailed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ETHTransferFailed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "FailedInnerCall",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "InvalidRound",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "MaxWalletCapReached",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "MinimumAmountIs10USD",
+    "type": "error"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+    }],
+    "name":
+    "OwnableInvalidOwner",
+    "type":
+    "error"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+    }],
+    "name":
+    "OwnableUnauthorizedAccount",
+    "type":
+    "error"
+}, {
+    "inputs": [],
+    "name": "PresaleIsOver",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "PresaleIsPaused",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "PresaleRoundIsAlreadyOver",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "PriceCantNotBeZero",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+    }],
+    "name":
+    "SafeERC20FailedOperation",
+    "type":
+    "error"
+}, {
+    "inputs": [],
+    "name": "TokenClaimFailed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "USDPaymentFailed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "UpdateBoolValue",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ValuesAlreadyExists",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ZeroAddressNotAllowed",
+    "type": "error"
+}, {
+    "inputs": [],
+    "name": "ZeroAmountNotAllowed",
+    "type": "error"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "bool",
+        "name": "value",
+        "type": "bool"
+    }],
+    "name":
+    "ClaimEnabled",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "address",
+        "name": "newMultiSig",
+        "type": "address"
+    }],
+    "name":
+    "MultiSigUpdated",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+    }],
+    "name":
+    "NextRoundStarted",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+    }, {
+        "indexed": True,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+    }],
+    "name":
+    "OwnershipTransferStarted",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+    }, {
+        "indexed": True,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+    }],
+    "name":
+    "OwnershipTransferred",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "newEndTime",
+        "type": "uint256"
+    }],
+    "name":
+    "PresaleDateUpdated",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "bool",
+        "name": "value",
+        "type": "bool"
+    }],
+    "name":
+    "PresalePaused",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "currentRoundPrice",
+        "type": "uint256"
+    }, {
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "nextRoundPrice",
+        "type": "uint256"
+    }],
+    "name":
+    "PriceUpdated",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+    }, {
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "usd",
+        "type": "uint256"
+    }],
+    "name":
+    "TokensBought",
+    "type":
+    "event"
+}, {
+    "anonymous":
+    False,
+    "inputs": [{
+        "indexed": True,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+    }, {
+        "indexed": True,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+    }],
+    "name":
+    "TokensClaimed",
+    "type":
+    "event"
+}, {
+    "inputs": [],
+    "name":
+    "USDT",
+    "outputs": [{
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+    }],
+    "name":
+    "addTokensToSale",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "buyWithETH",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "_usdAmount",
+        "type": "uint256"
+    }],
+    "name":
+    "buyWithUSDT",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "claim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [],
+    "name": "claimEther",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "othertkn",
+        "type": "address"
+    }, {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+    }],
+    "name":
+    "claimOtherERC20",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "currentRound",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "enableClaims",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+    }],
+    "name":
+    "ethUSDHelper",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "usdAmount",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "getClaimStatus",
+    "outputs": [{
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "getEndDateOfCurrentRound",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "endDate",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "getHardcapCurrentRound",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "hardcap",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "getLatestPrice",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "getRaisedAmountCurrentRound",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "raised",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "_usdAmount",
+        "type": "uint256"
+    }],
+    "name":
+    "getTokenAmount",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "tokensOutput",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "multiSig",
+    "outputs": [{
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "owner",
+    "outputs": [{
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "pendingOwner",
+    "outputs": [{
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "presalePausedStatus",
+    "outputs": [{
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+    }],
+    "name":
+    "removeTokensFromSale",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "name":
+    "rounds",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "currentPrice",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "nextPrice",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "totalTokens",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "totalSold",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "startTime",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "endTime",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "endDate",
+        "type": "uint256"
+    }],
+    "name":
+    "setEndDateForCurrentRound",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "uint256",
+        "name": "_newPrice",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "_nextPrice",
+        "type": "uint256"
+    }],
+    "name":
+    "setPrice",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+    }],
+    "name":
+    "setToken",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name": "switchToNextRound",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [],
+    "name": "togglePauseUnpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+}, {
+    "inputs": [],
+    "name":
+    "token",
+    "outputs": [{
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "totalTokensForSale",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "totalTokensSold",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [],
+    "name":
+    "totalUSDRaised",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+    }],
+    "name":
+    "transferOwnership",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "_multisig",
+        "type": "address"
+    }],
+    "name":
+    "updateMultiSigWallet",
+    "outputs": [],
+    "stateMutability":
+    "nonpayable",
+    "type":
+    "function"
+}, {
+    "inputs": [{
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+    }],
+    "name":
+    "users",
+    "outputs": [{
+        "internalType": "uint256",
+        "name": "totalUSDContributed",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "totalTokensBought",
+        "type": "uint256"
+    }, {
+        "internalType": "uint256",
+        "name": "totalTokensClaimed",
+        "type": "uint256"
+    }],
+    "stateMutability":
+    "view",
+    "type":
+    "function"
+}]
+
+w3 = Web3(Web3.HTTPProvider(ETH_NODE_URL))
+contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=CONTRACT_ABI)
+TELEGRAM_BOT_TOKEN = 'your_telegram_bot_token'
+
+
+# Command handler for /stats command
+def stats(update: Update, context: CallbackContext) -> None:
+  # Implement logic to query smart contract data
+  spent = contract.functions.buyWithETH().call()
+  got = contract.functions.totalTokensSold().call()
+  total_raised = contract.functions.totalUSDRaised().call()
+
+  # Send the information to the user
+  update.message.reply_text(f"Spent: {spent} USD\n"
+                            f"Got: {got} Tokens\n"
+                            f"Total Raised: {total_raised} Tokens")
+
+
+def main() -> None:
+  # Set up the Telegram bot
+  updater = Updater(token=TELEGRAM_BOT_TOKEN)
+  dispatcher = updater.dispatcher
+
+  # Register the /stats command
+  dispatcher.add_handler(CommandHandler("stats", stats))
+
+  # Start polling for updates
+  updater.start_polling()
+
+  # Run the bot until you send a signal to stop
+  updater.idle()
+
+
+if __name__ == '__main__':
+  main()
